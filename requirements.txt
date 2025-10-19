@@ -1,0 +1,5 @@
+flask>=3.0.0
+pyobjc-framework-EventKit>=11.0
+pyobjc-core>=11.0
+pytest==8.3.3
+ruff>=0.9.3

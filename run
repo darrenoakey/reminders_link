@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+TEST_OUT = Path("output/testing")
+
+# ##################################################################
+# run command
+# executes a shell command and returns the exit code
+def _run(cmd: list[str]) -> int:
+    return subprocess.call(cmd)
+
+# ##################################################################
+# test command
+# runs pytest for a specific target and logs output
+def command_test(args: argparse.Namespace) -> int:
+    TEST_OUT.mkdir(parents=True, exist_ok=True)
+    target = args.target
+    log = TEST_OUT / (target.replace('/', '_').replace(':','_') + ".log")
+    rc = _run(["pytest", "-q", target, "--maxfail=1", "--disable-warnings"])
+    return rc
+
+# ##################################################################
+# lint command
+# runs ruff linter with line length 120
+def command_lint(_: argparse.Namespace) -> int:
+    return _run(["ruff", "check", "--line-length", "120"])
+
+# ##################################################################
+# check command
+# runs full test suite and validation gates via dazpycheck
+def command_check(_: argparse.Namespace) -> int:
+    return _run(["dazpycheck"])
+
+# ##################################################################
+# server command
+# starts the Flask server on port 18888
+def command_server(_: argparse.Namespace) -> int:
+    import os
+    script_dir = Path(__file__).parent.absolute()
+    os.chdir(script_dir)
+    os.environ["FLASK_APP"] = "src.api:app"
+    return _run(["python3", "-m", "flask", "run", "--host", "0.0.0.0", "--port", "18888"])
+
+# ##################################################################
+# main
+# parses arguments and dispatches to the appropriate command handler
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_test = sub.add_parser("test", help="Run a single test target")
+    p_test.add_argument("target", help="e.g. src/eventkit_test.py::test_list_calendars")
+    p_test.set_defaults(func=command_test)
+
+    p_lint = sub.add_parser("lint", help="Run linter")
+    p_lint.set_defaults(func=command_lint)
+
+    p_check = sub.add_parser("check", help="Run full suite and gates")
+    p_check.set_defaults(func=command_check)
+
+    p_server = sub.add_parser("server", help="Start the API server")
+    p_server.set_defaults(func=command_server)
+
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+# ##################################################################
+# entry point
+# standard python pattern for dispatching main
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
