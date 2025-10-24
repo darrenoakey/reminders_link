@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 import EventKit
 from . import eventkit
@@ -8,6 +8,8 @@ from . import eventkit
 # reminders cache
 # in memory cache for reminders organized by list with refresh capability
 class RemindersCache:
+    # Cache time-to-live in seconds
+    CACHE_TTL_SECONDS = 300  # 5 minutes
     # ##################################################################
     # init
     # initializes empty cache with event store reference
@@ -17,10 +19,19 @@ class RemindersCache:
         self.last_refresh: dict[str, datetime] = {}
 
     # ##################################################################
+    # is cache stale
+    # checks if cached data for a list is older than the TTL threshold
+    def _is_cache_stale(self, list_id: str) -> bool:
+        if list_id not in self.last_refresh:
+            return True
+        age = datetime.now() - self.last_refresh[list_id]
+        return age.total_seconds() > self.CACHE_TTL_SECONDS
+
+    # ##################################################################
     # get reminders
     # retrieves reminders from cache or fetches if not cached and filters by completion
     def get_reminders(self, list_id: str, include_completed: bool = False) -> list[dict]:
-        if list_id not in self.cache:
+        if list_id not in self.cache or self._is_cache_stale(list_id):
             self._refresh_list(list_id)
 
         reminders = list(self.cache.get(list_id, {}).values())
